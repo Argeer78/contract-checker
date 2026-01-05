@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 
 export default function Home() {
   const [contractText, setContractText] = useState('');
+  const [analysisType, setAnalysisType] = useState<'contract' | 'invoice'>('contract');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -49,7 +50,7 @@ export default function Home() {
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        body: JSON.stringify({ text: contractText }),
+        body: JSON.stringify({ text: contractText, type: analysisType }),
         headers: { 'Content-Type': 'application/json' },
       });
 
@@ -183,13 +184,43 @@ export default function Home() {
           Supports contracts in any language
         </div>
 
+        {/* Mode Toggle */}
+        <div className="flex w-full bg-slate-100 dark:bg-slate-800 p-1 rounded-lg mb-6 shadow-sm">
+          <button
+            onClick={() => setAnalysisType('contract')}
+            className={cn(
+              "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2",
+              analysisType === 'contract'
+                ? "bg-white dark:bg-slate-700 shadow-sm text-brand-600 dark:text-brand-400"
+                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            )}
+          >
+            <Scale className="w-4 h-4" /> Contract Scanner
+          </button>
+          <button
+            onClick={() => setAnalysisType('invoice')}
+            className={cn(
+              "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2",
+              analysisType === 'invoice'
+                ? "bg-white dark:bg-slate-700 shadow-sm text-brand-600 dark:text-brand-400"
+                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            )}
+          >
+            <FileText className="w-4 h-4" /> Invoice Auditor
+          </button>
+        </div>
+
         {/* Input Zone */}
-        <div className="w-full mt-8 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 overflow-hidden ring-1 ring-slate-900/5 transition-all focus-within:ring-brand-500 focus-within:border-brand-500">
+        <div className="w-full bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 overflow-hidden ring-1 ring-slate-900/5 transition-all focus-within:ring-brand-500 focus-within:border-brand-500">
           <textarea
             value={contractText}
             onChange={(e) => setContractText(e.target.value)}
             maxLength={charLimit}
-            placeholder={user ? "Paste a contract clause here..." : "Sign in to analyze contract clauses..."}
+            placeholder={
+              user
+                ? (analysisType === 'contract' ? "Paste a contract clause here..." : "Paste invoice text (or upload PDF)...")
+                : "Sign in to analyze..."
+            }
             className="w-full h-40 md:h-56 p-4 resize-none outline-none text-slate-700 dark:text-slate-200 bg-transparent text-base md:text-lg placeholder:text-slate-400"
           />
           <div className="flex justify-between items-center px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 rounded-b-xl">
@@ -225,7 +256,7 @@ export default function Home() {
                 ) : (
                   <>
                     <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} />
-                    <span>Upload PDF</span>
+                    <span>Upload {analysisType === 'invoice' ? 'Invoice' : 'Contract'} PDF</span>
                   </>
                 )}
               </label>
@@ -245,7 +276,7 @@ export default function Home() {
               ) : !user ? (
                 <>Sign In to Analyze</>
               ) : (
-                <>Analyze Clause <FileText className="w-4 h-4" /></>
+                <>{analysisType === 'invoice' ? 'Audit Invoice' : 'Analyze Clause'} <Sparkles className="w-4 h-4" /></>
               )}
             </button>
           </div>

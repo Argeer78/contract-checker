@@ -27,45 +27,66 @@ export async function POST(req: Request) {
             return new Response('Unauthorized: Please sign in.', { status: 401 });
         }
 
-        const { text } = await req.json();
+        const { text, type = 'contract' } = await req.json();
         if (!text || text.length < 10) {
             return new Response('Text too short', { status: 400 });
         }
+
+        const isInvoice = type === 'invoice';
+
+        const contractSystemPrompt = `
+            You are an expert legal contract AI. 
+            
+            CRITICAL INSTRUCTION FOR GARBLED TEXT (MOJIBAKE):
+            The input text is likely GREEK text that has been incorrectly encoded as Latin Extended characters (e.g., "OgerAtrq", "e({6:H", "EIKOEI").
+            1. REPAIR: Attempt to mentally reconstruct the original Greek text. Treat this as a "noisy channel" or substitution cipher problem.
+            2. ANALYZE: Once you have inferred the true meaning, analyze the contract for risks.
+            3. OUTPUT: Provide the analysis in ENGLISH (unless the user asks otherwise).
+
+            Task:
+            Analyze the following contract text. Identify any risks, especially regarding termination, liability, payment terms, or IP rights.
+            
+            Risk Assessment Guide:
+            - Low Risk: Standard/fair terms.
+            - Medium Risk: Potential pitfalls or ambiguity.
+            - High Risk: One-sided, unlimited liability, termination without cause, or aggressive penalties.
+        `;
+
+        const invoiceSystemPrompt = `
+            You are an expert Audit AI specialized in analyzing Invoices.
+            
+            Your Job:
+            1. EXTRACT key details: Vendor, Date, Invoice Number, Total Amount, Tax/VAT.
+            2. VALIDATE the math: Do the line items sum up to the total? Is the Tax calculated correctly?
+            3. AUDIT for anomalies: High risk if Tax ID is missing, Vendor address is vague, or math is wrong.
+            
+            Output Mapping:
+            - 'summary': A brief audit report (e.g., "Invoice #101 from Acme Corp. Math passed. Total $500.").
+            - 'clauses': List specific FINDINGS (not necessarily clauses).
+                - 'text': The data point (e.g., "Total: $500", "Tax ID: Missing").
+                - 'risk': High if Math fail or Missing Legal Info (Tax ID).
+                - 'explanation': Audit comment (e.g., "Calculated sum is $450 but Total says $500").
+        `;
+
+        const systemPrompt = isInvoice ? invoiceSystemPrompt : contractSystemPrompt;
 
         try {
             const { object } = await generateObject({
                 model: openai('gpt-4o-mini'),
                 schema: z.object({
                     riskLevel: z.enum(['Low', 'Medium', 'High']),
-                    summary: z.string().describe('A plain English explanation of the clause, 2-3 sentences max.'),
+                    summary: z.string().describe('Audit summary or Contract summary.'),
                     clauses: z.array(z.object({
-                        text: z.string().describe('The specific risky sentence from the original text (repaired if possible).'),
+                        text: z.string().describe('The verified text or finding.'),
                         risk: z.enum(['Low', 'Medium', 'High']),
-                        explanation: z.string().describe('Why this specific sentence is risky.')
+                        explanation: z.string().describe('Audit finding or Risk explanation.')
                     }))
                 }),
                 prompt: `
-            You are an expert legal contract AI. 
-            
-            CRITICAL INSTRUCTION FOR GARBLED TEXT (MOJIBAKE):
-            The input text is likely GREEK text that has been incorrectly encoded as Latin Extended characters (e.g., "OgerAtrq", "e({6:H", "EIKOEI").
-            1. REPAIR: Attempt to mentally reconstruct the original Greek text. Treat this as a "noisy channel" or substitution cipher problem.
-               - Example: "Tpdne(o" -> "Τράπεζα" (Bank)
-               - Example: "OgerAtrq" -> "Οφειλέτης" (Borrower/Debtor)
-               - Example: "Adveto" -> "Δάνειο" (Loan)
-            2. ANALYZE: Once you have inferred the true meaning, analyze the contract for risks.
-            3. OUTPUT: Provide the analysis in ENGLISH (unless the user asks otherwise), but when citing specific clauses in the 'text' field, provide the REPAIRED Greek text if you are confident, or the original garbled text if not.
-
-            Task:
-            Analyze the following contract text. Identify any risks, especially regarding termination, liability, payment terms, or IP rights.
+            ${systemPrompt}
             
             Text to analyze:
             "${text}"
-            
-            Risk Assessment Guide:
-            - Low Risk: Standard/fair terms.
-            - Medium Risk: Potential pitfalls or ambiguity.
-            - High Risk: One-sided, unlimited liability, termination without cause, or aggressive penalties.
           `,
             });
             return Response.json(object);
