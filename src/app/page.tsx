@@ -34,7 +34,14 @@ export default function Home() {
     router.refresh();
   };
 
+  const isPro = user?.app_metadata?.plan === 'pro' || user?.app_metadata?.role === 'admin';
+  const charLimit = isPro ? 100000 : 2000;
+
   const handleAnalyze = async () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     if (!contractText.trim()) return;
     setIsAnalyzing(true);
     setResult(null);
@@ -47,6 +54,7 @@ export default function Home() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) router.push('/login');
         throw new Error(`Analysis failed with status ${response.status}`);
       }
 
@@ -64,6 +72,16 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    if (!isPro) {
+      setIsPricingOpen(true);
+      return;
+    }
+
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', file);
@@ -80,10 +98,9 @@ export default function Home() {
       setContractText(data.text);
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('Failed to upload PDF. Please try again.');
+      alert('Failed to upload PDF. Please upgrade to Pro.');
     } finally {
       setIsUploading(false);
-      // Reset input
       e.target.value = '';
     }
   };
@@ -130,13 +147,18 @@ export default function Home() {
 
         {user ? (
           <div className="absolute top-6 right-6 md:top-10 md:right-10 flex items-center gap-4">
-            <span className="text-xs text-slate-500 hidden md:block">{user.email}</span>
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-slate-500 hidden md:block">{user.email}</span>
+              {isPro && <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400 bg-brand-100 dark:bg-brand-900/50 px-1.5 rounded-full">PRO MEMBER</span>}
+            </div>
             <button onClick={handleSignOut} className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
               Sign Out
             </button>
-            <button onClick={openPricing} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-600 text-white rounded-full font-bold shadow-lg hover:scale-105 transition-transform">
-              <Sparkles className="w-4 h-4" /> Go Pro
-            </button>
+            {!isPro && (
+              <button onClick={openPricing} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-600 text-white rounded-full font-bold shadow-lg hover:scale-105 transition-transform">
+                <Sparkles className="w-4 h-4" /> Go Pro
+              </button>
+            )}
           </div>
         ) : (
           <button onClick={() => router.push('/login')} className="absolute top-6 right-6 md:top-10 md:right-10 text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors">
@@ -163,32 +185,43 @@ export default function Home() {
           <textarea
             value={contractText}
             onChange={(e) => setContractText(e.target.value)}
-            placeholder="Paste a contract clause here..."
+            maxLength={charLimit}
+            placeholder={user ? "Paste a contract clause here..." : "Sign in to analyze contract clauses..."}
             className="w-full h-40 md:h-56 p-4 resize-none outline-none text-slate-700 dark:text-slate-200 bg-transparent text-base md:text-lg placeholder:text-slate-400"
           />
           <div className="flex justify-between items-center px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 rounded-b-xl">
             <div className="flex items-center gap-4">
-              <span className="text-xs text-slate-500 font-medium">
-                {contractText.length} characters
+              <span className={cn("text-xs font-medium", contractText.length >= charLimit ? "text-red-500" : "text-slate-500")}>
+                {contractText.length} / {isPro ? 'Unlimited' : charLimit} characters
               </span>
-              <label className={cn(
-                "text-xs font-medium transition-colors flex items-center gap-1.5",
-                !user
-                  ? "text-slate-400 cursor-not-allowed"
-                  : isUploading
-                    ? "text-slate-400 cursor-wait"
-                    : "text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 cursor-pointer"
-              )}>
+              <label
+                onClick={(e) => {
+                  if (!user) { e.preventDefault(); router.push('/login'); }
+                  else if (!isPro) { e.preventDefault(); openPricing(); }
+                }}
+                className={cn(
+                  "text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer",
+                  !isPro && user
+                    ? "text-slate-400 hover:text-slate-600"
+                    : isUploading
+                      ? "text-slate-400 cursor-wait"
+                      : "text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                )}>
                 {!user ? (
                   <span className="flex items-center gap-1" title="Sign in to upload PDFs">
                     <Lock className="w-3 h-3" />
                     <span>Sign in to Upload PDF</span>
                   </span>
+                ) : !isPro ? (
+                  <span className="flex items-center gap-1" title="Upgrade to Pro to upload PDFs">
+                    <Lock className="w-3 h-3 text-amber-500" />
+                    <span className="text-amber-600">Upgrade to Upload PDF</span>
+                  </span>
                 ) : isUploading ? (
                   <span>Uploading...</span>
                 ) : (
                   <>
-                    <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} disabled={!user} />
+                    <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} />
                     <span>Upload PDF</span>
                   </>
                 )}
@@ -196,16 +229,18 @@ export default function Home() {
             </div>
             <button
               onClick={handleAnalyze}
-              disabled={isAnalyzing || !contractText}
+              disabled={isAnalyzing}
               className={cn(
                 "rounded-lg px-6 py-2.5 font-semibold text-white shadow-xs transition-all flex items-center gap-2",
-                isAnalyzing || !contractText
+                isAnalyzing || (!contractText && user)
                   ? "bg-slate-300 dark:bg-slate-700 cursor-not-allowed"
                   : "bg-brand-600 hover:bg-brand-500 shadow-brand-500/25 active:scale-95"
               )}
             >
               {isAnalyzing ? (
                 <>Analyzing...</>
+              ) : !user ? (
+                <>Sign In to Analyze</>
               ) : (
                 <>Analyze Clause <FileText className="w-4 h-4" /></>
               )}

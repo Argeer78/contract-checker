@@ -4,8 +4,29 @@ import { z } from 'zod';
 
 export const maxDuration = 60;
 
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+
 export async function POST(req: Request) {
     try {
+        const cookieStore = await cookies();
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) {
+                        return cookieStore.get(name)?.value;
+                    },
+                },
+            }
+        );
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return new Response('Unauthorized: Please sign in.', { status: 401 });
+        }
+
         const { text } = await req.json();
         if (!text || text.length < 10) {
             return new Response('Text too short', { status: 400 });
