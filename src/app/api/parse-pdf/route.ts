@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 // Configure PDF.js worker
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+// pdfjs-dist will be imported dynamically to prevent build-time/top-level issues
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -45,6 +45,10 @@ export async function POST(req: NextRequest) {
         const arrayBuffer = await file.arrayBuffer();
         // pdfjs-dist requires explicit Uint8Array or ArrayBuffer
         const uint8Array = new Uint8Array(arrayBuffer);
+
+        // Dynamically import pdfjs-dist to ensure it works in the serverless environment
+        // and catch any loading errors explicitly
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
         const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
         const doc = await loadingTask.promise;
