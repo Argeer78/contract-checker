@@ -59,8 +59,14 @@ export async function POST(req: NextRequest) {
                 try {
                     const rawText = pdfParser.getRawTextContent();
                     // Decode URL entities (required for non-Latin characters)
-                    const decodedText = decodeURIComponent(rawText);
-                    resolve(decodedText);
+                    // But handle cases where text might contain "%" that isn't an escape sequence
+                    try {
+                        const decodedText = decodeURIComponent(rawText);
+                        resolve(decodedText);
+                    } catch (decodeError) {
+                        console.warn('Text decoding failed, returning raw text:', decodeError);
+                        resolve(rawText);
+                    }
                 } catch (e) {
                     reject(e);
                 }
