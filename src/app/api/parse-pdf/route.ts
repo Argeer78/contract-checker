@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import PDFParser from 'pdf2json';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Polyfill for pdf-parse in Node environment
-if (typeof global.DOMMatrix === 'undefined') {
-    // @ts-ignore
-    global.DOMMatrix = class DOMMatrix { };
-}
-
 export async function POST(req: NextRequest) {
     try {
-        // @ts-ignore
-        const pdf = require('pdf-parse');
         const formData = await req.formData();
         const file = formData.get('file') as File;
 
@@ -22,11 +15,32 @@ export async function POST(req: NextRequest) {
 
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
+
         console.log('Buffer size:', buffer.length);
 
-        const data = await pdf(buffer);
+        const parsedText = await new Promise<string>((resolve, reject) => {
+            const pdfParser = new PDFParser(null, 1); // 1 = text only
 
-        return NextResponse.json({ text: data.text });
+            pdfParser.on("pdfParser_dataError", (errData: any) => {
+                console.error('PDFParser Error:', errData.parserError);
+                reject(new Error(errData.parserError));
+            });
+
+            pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+                // pdf2json returns raw text content often URL encoded
+                // rawTextContent is usually the plain text
+                try {
+                    const rawText = pdfParser.getRawTextContent();
+                    resolve(rawText);
+                } catch (e) {
+                    reject(e);
+                }
+            });
+
+            pdfParser.parseBuffer(buffer);
+        });
+
+        return NextResponse.json({ text: parsedText });
     } catch (error: any) {
         console.error('PDF Parse Error:', error);
         return NextResponse.json({ error: `Failed to parse PDF: ${error.message}` }, { status: 500 });

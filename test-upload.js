@@ -4,7 +4,15 @@ const path = require('path');
 async function testUpload() {
     try {
         const filePath = path.join(__dirname, 'test.pdf');
+        // Ensure file exists
+        if (!fs.existsSync(filePath)) {
+            console.error('Test PDF not found');
+            return;
+        }
+
         const fileBuffer = fs.readFileSync(filePath);
+        console.log(`Sending file of size: ${fileBuffer.length} bytes`);
+
         const blob = new Blob([fileBuffer], { type: 'application/pdf' });
 
         const formData = new FormData();
@@ -17,14 +25,14 @@ async function testUpload() {
 
         if (!response.ok) {
             const text = await response.text();
-            console.log('Server Error Body:', text);
+            console.log(`Server Error (${response.status}):`, text);
             return;
         }
 
         const data = await response.json();
-        console.log('Success:', data);
+        console.log('Success:', JSON.stringify(data, null, 2));
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Script Error:', error);
     }
 }
 
