@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import PDFParser from 'pdf2json';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-
-// Configure PDF.js worker
-// pdfjs-dist will be imported dynamically to prevent build-time/top-level issues
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -43,31 +41,40 @@ export async function POST(req: NextRequest) {
         }
 
         const arrayBuffer = await file.arrayBuffer();
-        // pdfjs-dist requires explicit Uint8Array or ArrayBuffer
-        const uint8Array = new Uint8Array(arrayBuffer);
+        const buffer = Buffer.from(arrayBuffer);
 
-        // Dynamically import pdfjs-dist to ensure it works in the serverless environment
-        // and catch any loading errors explicitly
-        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        const parsedText = await new Promise<string>((resolve, reject) => {
+            // @ts-ignore
+            const pdfParser = new PDFParser(null, 1); // 1 = text only
 
-        const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
-        const doc = await loadingTask.promise;
+            pdfParser.on("pdfParser_dataError", (errData: any) => {
+                console.error('PDFParser Error:', errData.parserError);
+                reject(new Error(errData.parserError));
+            });
 
-        let fullText = '';
+            pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+                try {
+                    const rawText = pdfParser.getRawTextContent();
 
-        for (let i = 1; i <= doc.numPages; i++) {
-            const page = await doc.getPage(i);
-            const textContent = await page.getTextContent();
+                    // pdf2json returns text URL-encoded. We must decode it.
+                    // We use try-catch in case it's already decoded or malformed.
+                    try {
+                        const decodedText = decodeURIComponent(rawText);
+                        resolve(decodedText);
+                    } catch (decodeErr) {
+                        // Fallback to raw text if decoding fails, but replacing "+" with space might help
+                        console.warn('Text decoding failed:', decodeErr);
+                        resolve(rawText);
+                    }
+                } catch (e) {
+                    reject(e);
+                }
+            });
 
-            // Concatenate text items
-            const pageText = textContent.items
-                .map((item: any) => item.str)
-                .join(' ');
+            pdfParser.parseBuffer(buffer);
+        });
 
-            fullText += pageText + '\n\n';
-        }
-
-        return NextResponse.json({ text: fullText });
+        return NextResponse.json({ text: parsedText });
     } catch (error: any) {
         console.error('PDF Parse Error:', error);
         return NextResponse.json({ error: `Failed to parse PDF: ${error.message}` }, { status: 500 });

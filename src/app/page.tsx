@@ -92,13 +92,16 @@ export default function Home() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error('Failed to parse PDF');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to parse PDF');
+      }
 
       const data = await response.json();
       setContractText(data.text);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload failed:', error);
-      alert('Failed to upload PDF. Please upgrade to Pro.');
+      alert(`Upload failed: ${error.message}`);
     } finally {
       setIsUploading(false);
       e.target.value = '';
