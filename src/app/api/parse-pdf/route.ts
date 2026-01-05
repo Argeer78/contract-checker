@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
 
         // Check if user is Pro or Admin
         const isPro = user.app_metadata?.plan === 'pro' || user.app_metadata?.role === 'admin';
+
         if (!isPro) {
             return NextResponse.json({ error: 'Pro plan required for PDF upload.' }, { status: 403 });
         }
@@ -55,10 +56,11 @@ export async function POST(req: NextRequest) {
 
             pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
                 // pdf2json returns raw text content often URL encoded
-                // rawTextContent is usually the plain text
                 try {
                     const rawText = pdfParser.getRawTextContent();
-                    resolve(rawText);
+                    // Decode URL entities (required for non-Latin characters)
+                    const decodedText = decodeURIComponent(rawText);
+                    resolve(decodedText);
                 } catch (e) {
                     reject(e);
                 }
