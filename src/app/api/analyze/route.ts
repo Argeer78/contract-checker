@@ -25,6 +25,8 @@ export async function POST(req: Request) {
             prompt: `
         You are an expert contract analyst. Your job is to explain legal clauses to non-lawyers.
         Analyze the following contract text. Identify any risks, especially regarding termination, liability, payment terms, or IP rights.
+
+        IMPORTANT: If the input text is in a language other than English, you MUST provide your entire response (summary, clause explanations, etc.) in that SAME language. Do not translate back to English unless the input was English.
         
         Text to analyze:
         "${text}"

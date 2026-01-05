@@ -153,6 +153,11 @@ export default function Home() {
           Don't let legal jargon confuse you. Paste your contract clause below and get a plain English explanation and risk assessment instantly.
         </p>
 
+        <div className="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+          <span className="flex h-2 w-2 rounded-full bg-green-500"></span>
+          Supports contracts in any language
+        </div>
+
         {/* Input Zone */}
         <div className="w-full mt-8 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 overflow-hidden ring-1 ring-slate-900/5 transition-all focus-within:ring-brand-500 focus-within:border-brand-500">
           <textarea
