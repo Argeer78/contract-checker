@@ -1,11 +1,8 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-    apiVersion: '2025-01-27.acacia', // Use latest or matching version
-});
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET as string;
 
