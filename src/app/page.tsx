@@ -349,7 +349,7 @@ export default function Home() {
                           interval === 'yearly' ? "bg-white dark:bg-slate-700 shadow-sm text-brand-600 dark:text-brand-400" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                         )}
                       >
-                        Yearly <span className="ml-1 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold uppercase">-16%</span>
+                        Yearly <span className="ml-1 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold uppercase">-26%</span>
                       </button>
                     </div>
                   </div>
@@ -358,12 +358,12 @@ export default function Home() {
                   <div className="text-center space-y-2 py-4">
                     <div className="text-4xl font-bold text-slate-900 dark:text-white">
                       {currency === 'usd' ? '$' : '€'}
-                      {interval === 'monthly' ? (currency === 'usd' ? '9.00' : '7.99') : (currency === 'usd' ? '90.00' : '80.00')}
+                      {interval === 'monthly' ? (currency === 'usd' ? '9.99' : '9.00') : (currency === 'usd' ? '89.00' : '79.00')}
                       <span className="text-lg text-slate-500 font-normal">/{interval === 'monthly' ? 'mo' : 'yr'}</span>
                     </div>
                     {interval === 'yearly' && (
                       <div className="text-sm text-green-600 dark:text-green-400 font-medium">
-                        Save ~16% compared to monthly
+                        Save ~26% compared to monthly
                       </div>
                     )}
                     <p className="text-slate-500 text-sm">Cancel anytime. Secure checkout via Stripe.</p>

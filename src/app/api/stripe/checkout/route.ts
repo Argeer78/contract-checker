@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function POST(req: Request) {
     try {
@@ -14,8 +16,38 @@ export async function POST(req: Request) {
             priceId = process.env.STRIPE_PRICE_ID_USD_MONTHLY;
         }
 
+        // Get authenticated user
+        const cookieStore = await cookies();
+
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    getAll() {
+                        return cookieStore.getAll();
+                    },
+                    setAll(cookiesToSet) {
+                        try {
+                            cookiesToSet.forEach(({ name, value, options }) =>
+                                cookieStore.set(name, value, options)
+                            )
+                        } catch {
+                            // Ignored
+                        }
+                    },
+                },
+            }
+        );
+
+        const { data: { user } } = await supabase.auth.getUser();
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
+            client_reference_id: user?.id,
+            metadata: {
+                user_id: user?.id || null, // Ensure string or null
+            },
             line_items: [
                 {
                     price: priceId,
