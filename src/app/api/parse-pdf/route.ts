@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 // Configure PDF.js worker
-const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
