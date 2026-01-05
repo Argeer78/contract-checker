@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pdf from 'pdf-parse';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
+    // @ts-ignore
+    const pdf = require('pdf-parse');
     try {
         const formData = await req.formData();
         const file = formData.get('file') as File;
