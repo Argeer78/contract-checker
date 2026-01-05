@@ -39,21 +39,33 @@ export async function POST(req: Request) {
                     riskLevel: z.enum(['Low', 'Medium', 'High']),
                     summary: z.string().describe('A plain English explanation of the clause, 2-3 sentences max.'),
                     clauses: z.array(z.object({
-                        text: z.string().describe('The specific risky sentence from the original text.'),
+                        text: z.string().describe('The specific risky sentence from the original text (repaired if possible).'),
                         risk: z.enum(['Low', 'Medium', 'High']),
                         explanation: z.string().describe('Why this specific sentence is risky.')
                     }))
                 }),
                 prompt: `
-            You are an expert contract analyst. Your job is to explain legal clauses to non-lawyers.
-            Analyze the following contract text. Identify any risks, especially regarding termination, liability, payment terms, or IP rights.
+            You are an expert legal contract AI. 
+            
+            CRITICAL INSTRUCTION FOR GARBLED TEXT (MOJIBAKE):
+            The input text is likely GREEK text that has been incorrectly encoded as Latin Extended characters (e.g., "OgerAtrq", "e({6:H", "EIKOEI").
+            1. REPAIR: Attempt to mentally reconstruct the original Greek text. Treat this as a "noisy channel" or substitution cipher problem.
+               - Example: "Tpdne(o" -> "Τράπεζα" (Bank)
+               - Example: "OgerAtrq" -> "Οφειλέτης" (Borrower/Debtor)
+               - Example: "Adveto" -> "Δάνειο" (Loan)
+            2. ANALYZE: Once you have inferred the true meaning, analyze the contract for risks.
+            3. OUTPUT: Provide the analysis in ENGLISH (unless the user asks otherwise), but when citing specific clauses in the 'text' field, provide the REPAIRED Greek text if you are confident, or the original garbled text if not.
 
-            IMPORTANT: If the input text is in a language other than English, you MUST provide your entire response (summary, clause explanations, etc.) in that SAME language. Do not translate back to English unless the input was English.
+            Task:
+            Analyze the following contract text. Identify any risks, especially regarding termination, liability, payment terms, or IP rights.
             
             Text to analyze:
             "${text}"
             
-            Be conservative. If a clause seems standard/fair, it is Low Risk. If it has potential pitfalls, Medium. If it is clearly one-sided or dangerous (e.g. termination without cause, unlimited liability), High Risk.
+            Risk Assessment Guide:
+            - Low Risk: Standard/fair terms.
+            - Medium Risk: Potential pitfalls or ambiguity.
+            - High Risk: One-sided, unlimited liability, termination without cause, or aggressive penalties.
           `,
             });
             return Response.json(object);

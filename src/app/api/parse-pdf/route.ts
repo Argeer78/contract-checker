@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import PDFParser from 'pdf2json';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import path from 'path';
+import { pathToFileURL } from 'url';
+
+// Use pdfjs-dist v3 legacy build which supports CommonJS
+// We use require() to ensure Node.js behavior
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -26,8 +31,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Check if user is Pro or Admin
         const isPro = user.app_metadata?.plan === 'pro' || user.app_metadata?.role === 'admin';
+        console.log(`[API] Parsing PDF for user ${user.id} | Pro: ${isPro}`);
 
         if (!isPro) {
             return NextResponse.json({ error: 'Pro plan required for PDF upload.' }, { status: 403 });
@@ -41,40 +46,47 @@ export async function POST(req: NextRequest) {
         }
 
         const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        // pdfjs requires Uint8Array
+        const uint8Array = new Uint8Array(arrayBuffer);
 
-        const parsedText = await new Promise<string>((resolve, reject) => {
-            // @ts-ignore
-            const pdfParser = new PDFParser(null, 1); // 1 = text only
+        // Create absolute path for CMaps so Next.js can find them in production/dev
+        const cMapPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/cmaps/');
+        const standardFontDataPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts/');
 
-            pdfParser.on("pdfParser_dataError", (errData: any) => {
-                console.error('PDFParser Error:', errData.parserError);
-                reject(new Error(errData.parserError));
-            });
+        // Convert to file:// URL for Windows/PDF.js compatibility
+        // AND ensure trailing slash which is critical for directory URLs
+        const cMapUrl = pathToFileURL(cMapPath).href + '/';
+        const standardFontDataUrl = pathToFileURL(standardFontDataPath).href + '/';
 
-            pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
-                try {
-                    const rawText = pdfParser.getRawTextContent();
+        console.log('Using CMap URL:', cMapUrl);
 
-                    // pdf2json returns text URL-encoded. We must decode it.
-                    // We use try-catch in case it's already decoded or malformed.
-                    try {
-                        const decodedText = decodeURIComponent(rawText);
-                        resolve(decodedText);
-                    } catch (decodeErr) {
-                        // Fallback to raw text if decoding fails, but replacing "+" with space might help
-                        console.warn('Text decoding failed:', decodeErr);
-                        resolve(rawText);
-                    }
-                } catch (e) {
-                    reject(e);
-                }
-            });
-
-            pdfParser.parseBuffer(buffer);
+        // Load document
+        const loadingTask = pdfjsLib.getDocument({
+            data: uint8Array,
+            cMapUrl: cMapUrl,
+            cMapPacked: true,
+            standardFontDataUrl: standardFontDataUrl,
+            // Disable font face to avoid canvas dependency
+            disableFontFace: true,
+            verbosity: 5 // MAX VERBOSITY
         });
 
-        return NextResponse.json({ text: parsedText });
+        const doc = await loadingTask.promise;
+        let fullText = '';
+
+        for (let i = 1; i <= doc.numPages; i++) {
+            const page = await doc.getPage(i);
+            const textContent = await page.getTextContent();
+
+            // Join with empty string because some PDFs split characters into separate items
+            const pageText = textContent.items
+                .map((item: any) => item.str)
+                .join('');
+
+            fullText += pageText + '\n\n';
+        }
+
+        return NextResponse.json({ text: fullText });
     } catch (error: any) {
         console.error('PDF Parse Error:', error);
         return NextResponse.json({ error: `Failed to parse PDF: ${error.message}` }, { status: 500 });
